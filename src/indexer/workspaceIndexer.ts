@@ -60,7 +60,7 @@ export class WorkspaceIndexer implements vscode.Disposable {
       this.excludePatterns = Array.from(allPatterns);
     } catch {
       // No .gitignore or can't read it - use defaults
-      console.log("FlowDoc: No .gitignore found, using default excludes");
+      vscode.window.showInformationMessage("FlowDoc: No .gitignore found, using default excludes");
     }
   }
 
@@ -180,7 +180,7 @@ export class WorkspaceIndexer implements vscode.Disposable {
         this.index.nodesByFile.delete(uri.fsPath);
       }
     } catch (error) {
-      console.error(`FlowDoc: Error indexing ${uri.fsPath}:`, error);
+      vscode.window.showErrorMessage(`FlowDoc: Error indexing ${uri.fsPath}: ${error}`);
     }
   }
 

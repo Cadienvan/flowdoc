@@ -5,7 +5,7 @@
 
 import * as vscode from "vscode";
 
-const FLOWDOC_ID_PATTERN = /@flowdoc-id:\s*(\S+)/g;
+const FLOWDOC_ID_PATTERN = /@flowdoc-id:\s*(\S+)/;
 const FLOWDOC_TOPIC_PATTERN = /@flowdoc-topic:\s*(.+)/;
 
 export class FlowDocCodeLensProvider implements vscode.CodeLensProvider {
@@ -39,7 +39,7 @@ export class FlowDocCodeLensProvider implements vscode.CodeLensProvider {
       }
 
       // Find @flowdoc-id
-      const idMatch = line.match(/@flowdoc-id:\s*(\S+)/);
+      const idMatch = line.match(FLOWDOC_ID_PATTERN);
       if (idMatch && currentTopic) {
         const nodeId = idMatch[1];
         const range = new vscode.Range(i, 0, i, line.length);

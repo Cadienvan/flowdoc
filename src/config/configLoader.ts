@@ -49,7 +49,7 @@ export async function loadConfig(workspaceRoot: string): Promise<FlowDocConfig> 
  */
 function validateConfig(raw: unknown, workspaceRoot: string): FlowDocConfig {
   if (!raw || typeof raw !== "object") {
-    console.warn("FlowDoc: Invalid config format, using defaults");
+    vscode.window.showWarningMessage("FlowDoc: Invalid config format, using defaults");
     return DEFAULT_CONFIG;
   }
 

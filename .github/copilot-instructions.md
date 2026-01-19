@@ -102,7 +102,7 @@ For this POC, use silent error handling with logging:
 try {
   // operation
 } catch (error) {
-  console.error(`FlowDoc: Error description:`, error);
+  vscode.window.showErrorMessage(`FlowDoc: Error description: ${error}`);
   // continue or return default value
 }
 ```
