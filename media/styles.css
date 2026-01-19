@@ -1,0 +1,376 @@
+/* FlowDoc Webview Styles
+ * Uses VS Code theme variables for integration with dark/light themes
+ */
+
+:root {
+  --container-padding: 20px;
+  --border-radius: 4px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  padding: 0;
+  margin: 0;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-editor-background);
+}
+
+#app {
+  padding: var(--container-padding);
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* Header */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.4em;
+  color: var(--vscode-foreground);
+}
+
+/* Follow Me Checkbox */
+.follow-me-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85em;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--border-radius);
+}
+
+.follow-me-label:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.follow-me-label input {
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Buttons */
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  border: none;
+  border-radius: var(--border-radius);
+  padding: 8px 16px;
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+button:hover:not(:disabled) {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.icon-button {
+  background: transparent;
+  padding: 4px 8px;
+  color: var(--vscode-foreground);
+}
+
+.icon-button:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.text-button {
+  background: transparent;
+  color: var(--vscode-textLink-foreground);
+  padding: 4px 8px;
+  font-size: 0.9em;
+}
+
+.text-button:hover {
+  text-decoration: underline;
+}
+
+/* Node Card */
+#node-card {
+  background-color: var(--vscode-editor-inactiveSelectionBackground);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: var(--border-radius);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.node-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.node-id {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 1.1em;
+  font-weight: bold;
+  color: var(--vscode-symbolIcon-classForeground, var(--vscode-foreground));
+}
+
+.node-step {
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+}
+
+.node-dependency-note {
+  margin: 0;
+  padding: 8px 12px;
+  background-color: var(--vscode-textBlockQuote-background);
+  border-left: 3px solid var(--vscode-textBlockQuote-border);
+  font-style: italic;
+  color: var(--vscode-descriptionForeground);
+}
+
+.node-dependency-note:empty {
+  display: none;
+}
+
+/* Links Section */
+#links-section h4 {
+  margin: 16px 0 8px 0;
+  font-size: 0.9em;
+  color: var(--vscode-descriptionForeground);
+}
+
+.node-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.node-links li {
+  margin: 4px 0;
+}
+
+.node-links a {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.node-links a:hover {
+  text-decoration: underline;
+}
+
+.link-type {
+  font-size: 0.8em;
+  color: var(--vscode-descriptionForeground);
+  margin-left: 4px;
+}
+
+/* Navigation */
+#navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+#nav-info {
+  font-size: 0.9em;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Branch Selector */
+#branch-selector {
+  background-color: var(--vscode-editor-inactiveSelectionBackground);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: var(--border-radius);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+#branch-selector h4 {
+  margin: 0 0 12px 0;
+  color: var(--vscode-foreground);
+}
+
+#branch-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#branch-list li {
+  margin: 8px 0;
+}
+
+#branch-list button {
+  width: 100%;
+  text-align: left;
+  background-color: var(--vscode-list-hoverBackground);
+  padding: 10px 12px;
+}
+
+#branch-list button:hover {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
+.branch-id {
+  font-weight: bold;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.branch-step {
+  font-size: 0.9em;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* External branch indicator (cross-repo navigation) */
+#branch-list button.external-branch {
+  border-left: 3px solid var(--vscode-textLink-foreground);
+}
+
+.external-icon {
+  font-size: 0.9em;
+  margin-right: 4px;
+}
+
+/* Warnings Panel */
+#warnings-panel {
+  background-color: var(--vscode-inputValidation-warningBackground);
+  border: 1px solid var(--vscode-inputValidation-warningBorder);
+  border-radius: var(--border-radius);
+  padding: 16px;
+}
+
+.warnings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.warnings-header h3 {
+  margin: 0;
+  color: var(--vscode-foreground);
+}
+
+#warnings-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#warnings-list li {
+  padding: 8px;
+  margin: 4px 0;
+  background-color: var(--vscode-editor-background);
+  border-radius: var(--border-radius);
+  font-size: 0.9em;
+}
+
+.warning-type {
+  font-weight: bold;
+  color: var(--vscode-editorWarning-foreground);
+}
+
+.warning-node {
+  font-family: var(--vscode-editor-font-family);
+}
+
+/* Breadcrumbs Panel */
+#breadcrumbs-panel {
+  background-color: var(--vscode-editor-inactiveSelectionBackground);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: var(--border-radius);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.breadcrumbs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.breadcrumbs-header h3 {
+  margin: 0;
+  color: var(--vscode-foreground);
+}
+
+#breadcrumbs-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.breadcrumb-item button {
+  width: 100%;
+  text-align: left;
+  background-color: var(--vscode-list-hoverBackground);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.breadcrumb-item button:hover:not(.current) {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
+.breadcrumb-item button.current {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+  cursor: default;
+}
+
+.breadcrumb-step {
+  font-weight: bold;
+  min-width: 30px;
+}
+
+.breadcrumb-id {
+  font-size: 0.9em;
+  color: var(--vscode-descriptionForeground);
+}
+
+.breadcrumb-item button.current .breadcrumb-id {
+  color: var(--vscode-list-activeSelectionForeground);
+  opacity: 0.8;
+}
+
+/* Hidden utility */
+[hidden] {
+  display: none !important;
+}

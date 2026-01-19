@@ -1,0 +1,56 @@
+{
+  "name": "flowdoc",
+  "displayName": "FlowDoc",
+  "description": "Navigate code documentation graphs from @flowdoc-* comment tags",
+  "version": "0.0.1",
+  "publisher": "flowdoc",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "workspaceContains:**/*.php",
+    "workspaceContains:**/*.ts",
+    "workspaceContains:**/*.js"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "flowdoc.pickTopic",
+        "title": "FlowDoc: Pick Topic"
+      },
+      {
+        "command": "flowdoc.openGraph",
+        "title": "FlowDoc: Open Graph"
+      },
+      {
+        "command": "flowdoc.reindex",
+        "title": "FlowDoc: Reindex Workspace"
+      },
+      {
+        "command": "flowdoc.openAtNode",
+        "title": "FlowDoc: Open at Node"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.55.0"
+  },
+  "dependencies": {
+    "yaml": "^2.3.4"
+  }
+}
