@@ -42,6 +42,7 @@ export interface TopicGraph {
   childrenByDependencyId: Map<string, string[]>;
   roots: string[];
   warnings: GraphWarning[];
+  errors: GraphError[];
 }
 
 /**
@@ -53,6 +54,30 @@ export interface GraphWarning {
   message: string;
   sourceFile?: string;
   sourceLine?: number;
+}
+
+/**
+ * Error generated during parsing for missing required fields
+ */
+export interface GraphError {
+  type: "missing-topic" | "missing-id" | "missing-step";
+  message: string;
+  sourceFile: string;
+  sourceLine: number;
+  /** Partial data available for context */
+  partialData?: {
+    topic?: string;
+    id?: string;
+    step?: string;
+  };
+}
+
+/**
+ * Result from parsing a file, including nodes and validation errors
+ */
+export interface ParseResult {
+  nodes: FlowNode[];
+  errors: GraphError[];
 }
 
 /**
@@ -106,6 +131,7 @@ export type ExtensionToWebviewMessage =
       breadcrumbs: BreadcrumbNode[];
     }
   | { command: "showWarnings"; warnings: GraphWarning[] }
+  | { command: "showErrors"; errors: GraphError[] }
   | { command: "setTopic"; topic: string };
 
 /**

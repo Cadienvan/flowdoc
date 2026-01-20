@@ -3,7 +3,14 @@
  * Builds navigable graph structures from FlowNodes for a specific topic
  */
 
-import { FlowNode, TopicGraph, GraphWarning, FlowDocConfig } from "../types";
+import { FlowNode, TopicGraph, GraphWarning, GraphError, FlowDocConfig } from "../types";
+
+/**
+ * Pattern to extract numeric suffix from an ID
+ * Captures: [1] = prefix (everything before the number), [2] = numeric part (with leading zeros stripped for comparison)
+ * Example: "REG-001" → prefix="REG-", numericValue=1
+ */
+const NUMERIC_SUFFIX_PATTERN = /^(.+?)(\d+)$/;
 
 /**
  * Check if a dependency is a cross-repo reference (format: repo-name@node-id)
@@ -23,17 +30,106 @@ function parseCrossRepoDependency(dependency: string): { isExternal: boolean; re
 }
 
 /**
+ * Parse numeric suffix from an ID
+ * @param id - The node ID to parse
+ * @returns Object with prefix and numeric value, or null if no numeric suffix
+ */
+function parseNumericId(id: string): { prefix: string; numericValue: number; originalSuffix: string } | null {
+  const match = id.match(NUMERIC_SUFFIX_PATTERN);
+  if (!match) {
+    return null;
+  }
+  return {
+    prefix: match[1],
+    numericValue: parseInt(match[2], 10),
+    originalSuffix: match[2],
+  };
+}
+
+/**
+ * Apply auto-numeric linking for dependencies and children (bidirectional)
+ * For nodes with numeric suffixes (e.g., REG-001, STEP-2, TASK-03):
+ * - If no dependency: look for {prefix}{n-1} and auto-assign as dependency
+ * - If no children: look for {prefix}{n+1} and auto-add to children
+ * Handles mixed formats: 001 can link to 2 can link to 03
+ */
+function applyAutoNumericLinks(nodesById: Map<string, FlowNode>, childrenByDependencyId: Map<string, string[]>, roots: string[]): void {
+  // Build lookup map: prefix:numericValue → nodeId
+  const numericLookup = new Map<string, string>();
+  for (const [id] of nodesById) {
+    const parsed = parseNumericId(id);
+    if (parsed) {
+      const key = `${parsed.prefix}:${parsed.numericValue}`;
+      // First one wins (consistent with duplicate-id handling)
+      if (!numericLookup.has(key)) {
+        numericLookup.set(key, id);
+      }
+    }
+  }
+
+  // Process each node for auto-linking
+  for (const [id, node] of nodesById) {
+    const parsed = parseNumericId(id);
+    if (!parsed) {
+      continue;
+    }
+
+    const { prefix, numericValue } = parsed;
+
+    // Auto-assign dependency if none exists and {n-1} is found
+    if (!node.dependency && numericValue > 1) {
+      const prevKey = `${prefix}:${numericValue - 1}`;
+      const prevId = numericLookup.get(prevKey);
+      if (prevId && prevId !== id) {
+        // Mutate the node to add dependency
+        (node as { dependency: string | null }).dependency = prevId;
+
+        // Remove from roots since it now has a dependency
+        const rootIndex = roots.indexOf(id);
+        if (rootIndex !== -1) {
+          roots.splice(rootIndex, 1);
+        }
+
+        // Add this node as a child of the previous node
+        const existingChildren = childrenByDependencyId.get(prevId) || [];
+        if (!existingChildren.includes(id)) {
+          existingChildren.push(id);
+          existingChildren.sort((a, b) => a.localeCompare(b));
+          childrenByDependencyId.set(prevId, existingChildren);
+        }
+      }
+    }
+
+    // Auto-add children if none exist and {n+1} is found
+    const existingChildren = childrenByDependencyId.get(id) || [];
+    const nextKey = `${prefix}:${numericValue + 1}`;
+    const nextId = numericLookup.get(nextKey);
+    if (nextId && nextId !== id && !existingChildren.includes(nextId)) {
+      // Only add if the next node doesn't already have an explicit different dependency
+      const nextNode = nodesById.get(nextId);
+      if (nextNode && !nextNode.dependency) {
+        existingChildren.push(nextId);
+        existingChildren.sort((a, b) => a.localeCompare(b));
+        childrenByDependencyId.set(id, existingChildren);
+      }
+    }
+  }
+}
+
+/**
  * Build a navigable graph for a specific topic
  * - Detects duplicate IDs (first-wins)
  * - Detects missing dependencies (treated as dangling roots)
  * - Allows cross-repo dependencies if repo is configured
+ * - Auto-detects numeric sequences for dependencies/children
  * - Detects cycles via DFS
  * - Sorts roots and children alphabetically by ID
  * @param nodes - Array of FlowNodes to build graph from
  * @param topic - Topic name to filter nodes
  * @param config - Optional FlowDocConfig for cross-repo validation
+ * @param errors - Optional array of parsing errors to include in the graph
  */
-export function buildGraph(nodes: FlowNode[], topic: string, config?: FlowDocConfig): TopicGraph {
+export function buildGraph(nodes: FlowNode[], topic: string, config?: FlowDocConfig, errors?: GraphError[]): TopicGraph {
   const filtered = nodes.filter(n => n.topic === topic);
   const nodesById = new Map<string, FlowNode>();
   const childrenByDependencyId = new Map<string, string[]>();
@@ -141,7 +237,10 @@ export function buildGraph(nodes: FlowNode[], topic: string, config?: FlowDocCon
     childrenByDependencyId.set(parentId, children);
   }
 
-  // 5. Detect cycles via DFS
+  // 5. Auto-detect numeric sequences for dependencies/children (bidirectional)
+  applyAutoNumericLinks(nodesById, childrenByDependencyId, roots);
+
+  // 6. Detect cycles via DFS
   const visited = new Set<string>();
   const recursionStack = new Set<string>();
   const cycleNodes = new Set<string>();
@@ -182,12 +281,16 @@ export function buildGraph(nodes: FlowNode[], topic: string, config?: FlowDocCon
     detectCycle(rootId);
   }
 
+  // Filter errors for this topic only
+  const topicErrors = (errors || []).filter(e => e.partialData?.topic === topic);
+
   return {
     topic,
     nodesById,
     childrenByDependencyId,
     roots,
     warnings,
+    errors: topicErrors,
   };
 }
 

@@ -5,7 +5,7 @@
 
 import * as vscode from "vscode";
 import * as path from "path";
-import { FlowNode, WorkspaceIndex } from "../types";
+import { FlowNode, WorkspaceIndex, GraphError } from "../types";
 import { parseFile } from "../parser/commentParser";
 
 const SUPPORTED_GLOB = "**/*.{php,ts,js}";
@@ -13,6 +13,7 @@ const DEFAULT_EXCLUDES = ["**/node_modules/**", "**/.git/**", "**/vendor/**", "*
 
 export class WorkspaceIndexer implements vscode.Disposable {
   private index: WorkspaceIndex;
+  private errorsByFile: Map<string, GraphError[]> = new Map();
   private watcher: vscode.FileSystemWatcher | undefined;
   private disposables: vscode.Disposable[] = [];
   private workspaceRoot: string | undefined;
@@ -127,6 +128,7 @@ export class WorkspaceIndexer implements vscode.Disposable {
    */
   async fullScan(): Promise<void> {
     this.index.nodesByFile.clear();
+    this.errorsByFile.clear();
 
     const excludeGlob = this.buildExcludeGlob();
     const files = await vscode.workspace.findFiles(SUPPORTED_GLOB, excludeGlob);
@@ -172,12 +174,18 @@ export class WorkspaceIndexer implements vscode.Disposable {
     try {
       const document = await vscode.workspace.openTextDocument(uri);
       const content = document.getText();
-      const nodes = parseFile(content, uri.fsPath);
+      const result = parseFile(content, uri.fsPath);
 
-      if (nodes.length > 0) {
-        this.index.nodesByFile.set(uri.fsPath, nodes);
+      if (result.nodes.length > 0) {
+        this.index.nodesByFile.set(uri.fsPath, result.nodes);
       } else {
         this.index.nodesByFile.delete(uri.fsPath);
+      }
+
+      if (result.errors.length > 0) {
+        this.errorsByFile.set(uri.fsPath, result.errors);
+      } else {
+        this.errorsByFile.delete(uri.fsPath);
       }
     } catch (error) {
       vscode.window.showErrorMessage(`FlowDoc: Error indexing ${uri.fsPath}: ${error}`);
@@ -197,6 +205,7 @@ export class WorkspaceIndexer implements vscode.Disposable {
    */
   removeFile(uri: vscode.Uri): void {
     this.index.nodesByFile.delete(uri.fsPath);
+    this.errorsByFile.delete(uri.fsPath);
     this.index.lastUpdated = new Date();
   }
 
@@ -268,6 +277,17 @@ export class WorkspaceIndexer implements vscode.Disposable {
     const result: FlowNode[] = [];
     for (const nodes of this.index.nodesByFile.values()) {
       result.push(...nodes);
+    }
+    return result;
+  }
+
+  /**
+   * Get all parsing errors in the index
+   */
+  getAllErrors(): GraphError[] {
+    const result: GraphError[] = [];
+    for (const errors of this.errorsByFile.values()) {
+      result.push(...errors);
     }
     return result;
   }

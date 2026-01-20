@@ -282,9 +282,59 @@ The parser uses a simple line-based approach (no AST):
 
 1. Iterate line by line
 2. Check if line is a comment (`//`, `#`, `*`, `/*`)
-3. Extract `@flowdoc-*` tags via regex
-4. Accumulate tags into a "pending block"
-5. Finalize block when encountering non-flowdoc content
+3. Check for one-liner `@flowdoc-line` tag first (self-contained)
+4. Extract `@flowdoc-*` tags via regex
+5. Accumulate tags into a "pending block"
+6. Finalize block when encountering non-flowdoc content
+7. Generate errors for incomplete blocks (missing required fields)
+
+### One-Liner Syntax
+
+The `@flowdoc-line` tag provides a compact single-line format:
+
+```
+@flowdoc-line: TOPIC | ID | STEP | links | dependency | children
+```
+
+**Format details:**
+
+- Fields are pipe (`|`) separated
+- First 3 fields (TOPIC, ID, STEP) are required
+- Remaining fields (links, dependency, children) are optional
+- Empty optional fields can be omitted or left blank: `TOPIC | ID | STEP | | DEP-001`
+- One-liners are self-contained and don't affect `currentTopic` state
+
+**Parsing implementation:**
+
+```typescript
+const LINE_TAG_PATTERN = /@flowdoc-line:\s*(.+)/;
+
+function parseOneLiner(line: string): PendingBlock | null {
+  // Split by | and trim each part
+  const parts = match[1].split("|").map(p => p.trim());
+  // Map positions: [0]=topic, [1]=id, [2]=step, [3]=links, [4]=dependency, [5]=children
+}
+```
+
+### Error Generation (Validation)
+
+Errors are generated for missing required fields in `finalizeBlock()`:
+
+```typescript
+interface GraphError {
+  type: "missing-topic" | "missing-id" | "missing-step";
+  message: string;
+  sourceFile: string;
+  sourceLine: number;
+  partialData?: { topic?: string; id?: string; step?: string };
+}
+```
+
+**Key behavior:**
+
+- Errors are collected alongside valid nodes (partial graph display)
+- `parseFile()` returns `ParseResult { nodes: FlowNode[], errors: GraphError[] }`
+- Errors include partial data for context in error messages
 
 ### Adding New Tags
 
@@ -310,6 +360,35 @@ warnings.push({
   sourceFile: node.sourceFile,
   sourceLine: node.sourceLine,
 });
+```
+
+### Auto-Numeric Sequence Detection
+
+FlowDoc automatically detects and links nodes with numeric ID suffixes:
+
+**How it works:**
+
+1. Extract numeric suffix using regex: `/^(.+?)(\d+)$/`
+2. Build lookup map: `{prefix}:{numericValue}` → `nodeId`
+3. For nodes without explicit dependency: find `{prefix}{n-1}` and auto-assign
+4. For nodes without children: find `{prefix}{n+1}` and auto-add to children
+5. Bidirectional: creates both backward (dependency) and forward (children) links
+
+**Key behaviors:**
+
+- Handles mixed formats: `001`, `2`, `03` all recognized by numeric value
+- Only applies within the same topic
+- Explicit dependencies/children override auto-detection
+- First match wins for duplicate numeric values (consistent with ID handling)
+
+**Example:**
+
+```typescript
+// These auto-link as: STEP-001 → STEP-2 → STEP-03 → STEP-4
+// @flowdoc-id: STEP-001  (no dependency → root)
+// @flowdoc-id: STEP-2    (auto: dependency=STEP-001)
+// @flowdoc-id: STEP-03   (auto: dependency=STEP-2)
+// @flowdoc-id: STEP-4    (auto: dependency=STEP-03)
 ```
 
 ### Sorting Convention
@@ -461,15 +540,20 @@ Files in `node_modules` are excluded via glob pattern.
 
 ## Glossary
 
-| Term                  | Definition                                                       |
-| --------------------- | ---------------------------------------------------------------- |
-| FlowNode              | A documentation node extracted from @flowdoc-\* comments         |
-| TopicGraph            | The complete graph structure for a single topic                  |
-| Topic                 | A grouping identifier for related FlowNodes                      |
-| Dependency            | Reference to a parent FlowNode (creates backward graph edge)     |
-| Children              | Explicit forward references to child FlowNodes                   |
-| Cross-repo Dependency | Dependency in format `repo-name@node-id` for external repos      |
-| Cross-repo Child      | Child reference in format `repo-name@node-id` for external repos |
-| Root                  | A FlowNode with no dependency (entry point)                      |
-| Dangling Root         | A FlowNode whose dependency doesn't exist                        |
-| ExternalRepoRef       | Configuration entry mapping repo name to local filesystem path   |
+| Term                  | Definition                                                          |
+| --------------------- | ------------------------------------------------------------------- |
+| FlowNode              | A documentation node extracted from @flowdoc-\* comments            |
+| TopicGraph            | The complete graph structure for a single topic                     |
+| Topic                 | A grouping identifier for related FlowNodes                         |
+| Dependency            | Reference to a parent FlowNode (creates backward graph edge)        |
+| Children              | Explicit forward references to child FlowNodes                      |
+| Cross-repo Dependency | Dependency in format `repo-name@node-id` for external repos         |
+| Cross-repo Child      | Child reference in format `repo-name@node-id` for external repos    |
+| Root                  | A FlowNode with no dependency (entry point)                         |
+| Dangling Root         | A FlowNode whose dependency doesn't exist                           |
+| ExternalRepoRef       | Configuration entry mapping repo name to local filesystem path      |
+| One-liner             | Compact `@flowdoc-line` format with pipe-separated fields           |
+| GraphError            | Validation error for missing required fields (shown in red in UI)   |
+| GraphWarning          | Non-blocking warning for graph issues (shown in yellow in UI)       |
+| Auto-numeric          | Automatic dependency/children detection based on numeric ID suffix  |
+| ParseResult           | Return type from parser containing both `nodes` and `errors` arrays |

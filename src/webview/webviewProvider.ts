@@ -50,6 +50,11 @@ export class FlowDocWebviewProvider implements vscode.Disposable {
       this.postMessage({ command: "showWarnings", warnings: graph.warnings });
     }
 
+    // Show errors if any
+    if (graph.errors.length > 0) {
+      this.postMessage({ command: "showErrors", errors: graph.errors });
+    }
+
     // Navigate to specified node or first root
     if (startNodeId && graph.nodesById.has(startNodeId)) {
       this.navigateTo(startNodeId);
@@ -465,6 +470,9 @@ export class FlowDocWebviewProvider implements vscode.Disposable {
           <span>Follow</span>
         </label>
         <button id="btn-breadcrumbs" class="icon-button" title="Show all steps">📋</button>
+        <button id="errors-toggle" class="icon-button" hidden title="Show errors">
+          ❌ <span id="errors-count">0</span>
+        </button>
         <button id="warnings-toggle" class="icon-button" hidden title="Show warnings">
           ⚠️ <span id="warnings-count">0</span>
         </button>
@@ -509,6 +517,14 @@ export class FlowDocWebviewProvider implements vscode.Disposable {
         <button id="close-warnings" class="icon-button">✕</button>
       </div>
       <ul id="warnings-list"></ul>
+    </aside>
+
+    <aside id="errors-panel" hidden>
+      <div class="errors-header">
+        <h3>❌ Errors</h3>
+        <button id="close-errors" class="icon-button">✕</button>
+      </div>
+      <ul id="errors-list"></ul>
     </aside>
   </div>
 

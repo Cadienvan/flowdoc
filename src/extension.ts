@@ -118,7 +118,8 @@ async function pickTopic(): Promise<void> {
 
   if (selected) {
     const nodes = indexer.getNodesByTopic(selected);
-    currentGraph = buildGraph(nodes, selected, currentConfig);
+    const errors = indexer.getAllErrors();
+    currentGraph = buildGraph(nodes, selected, currentConfig, errors);
     webviewProvider.showGraph(currentGraph);
   }
 }
@@ -181,7 +182,8 @@ async function openAtNode(topic: string, nodeId: string): Promise<void> {
     return;
   }
 
-  currentGraph = buildGraph(nodes, topic, currentConfig);
+  const errors = indexer.getAllErrors();
+  currentGraph = buildGraph(nodes, topic, currentConfig, errors);
   webviewProvider.showGraph(currentGraph, nodeId);
 }
 

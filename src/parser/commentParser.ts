@@ -3,13 +3,14 @@
  * Line-based parser for extracting FlowNode from @flowdoc-* comment tags
  */
 
-import { FlowNode, Link } from "../types";
+import { FlowNode, Link, GraphError, ParseResult } from "../types";
 
 /**
  * Regex patterns for parsing
  */
 const COMMENT_LINE_PATTERN = /^\s*(?:\/\/|#|\*|\/\*)\s*/;
 const TAG_PATTERN = /@flowdoc-(topic|id|step|dependency|links|children):\s*(.+)/;
+const LINE_TAG_PATTERN = /@flowdoc-line:\s*(.+)/;
 const DEPENDENCY_WITH_NOTE_PATTERN = /^(\S+)\s*\[(.+)\]$/;
 const LINK_SEPARATOR = /\s*;\s*/;
 const CHILDREN_SEPARATOR = /\s*,\s*/;
@@ -109,23 +110,63 @@ function parseDependency(raw: string): { id: string; note: string | null } {
 
 /**
  * Convert a complete pending block to a FlowNode
- * Returns null if block is incomplete (missing required fields)
+ * Returns node if valid, or errors if missing required fields
  */
-function finalizeBlock(block: PendingBlock, sourceFile: string): FlowNode | null {
-  if (!block.topic || !block.id || !block.step) {
-    return null;
-  }
-
-  return {
+function finalizeBlock(block: PendingBlock, sourceFile: string): { node: FlowNode | null; errors: GraphError[] } {
+  const errors: GraphError[] = [];
+  const partialData = {
     topic: block.topic,
     id: block.id,
     step: block.step,
-    dependency: block.dependency || null,
-    dependencyNote: block.dependencyNote || null,
-    children: block.childrenRaw ? parseChildren(block.childrenRaw) : null,
-    links: block.linksRaw ? parseLinks(block.linksRaw) : [],
-    sourceFile,
-    sourceLine: block.startLine,
+  };
+
+  if (!block.topic) {
+    errors.push({
+      type: "missing-topic",
+      message: `Missing @flowdoc-topic in block${block.id ? ` (id: ${block.id})` : ""}.`,
+      sourceFile,
+      sourceLine: block.startLine,
+      partialData,
+    });
+  }
+
+  if (!block.id) {
+    errors.push({
+      type: "missing-id",
+      message: `Missing @flowdoc-id in block${block.topic ? ` (topic: ${block.topic})` : ""}.`,
+      sourceFile,
+      sourceLine: block.startLine,
+      partialData,
+    });
+  }
+
+  if (!block.step) {
+    errors.push({
+      type: "missing-step",
+      message: `Missing @flowdoc-step in block${block.id ? ` (id: ${block.id})` : ""}.`,
+      sourceFile,
+      sourceLine: block.startLine,
+      partialData,
+    });
+  }
+
+  if (errors.length > 0) {
+    return { node: null, errors };
+  }
+
+  return {
+    node: {
+      topic: block.topic!,
+      id: block.id!,
+      step: block.step!,
+      dependency: block.dependency || null,
+      dependencyNote: block.dependencyNote || null,
+      children: block.childrenRaw ? parseChildren(block.childrenRaw) : null,
+      links: block.linksRaw ? parseLinks(block.linksRaw) : [],
+      sourceFile,
+      sourceLine: block.startLine,
+    },
+    errors: [],
   };
 }
 
@@ -151,11 +192,61 @@ function extractTag(line: string): { tag: string; value: string } | null {
 }
 
 /**
- * Main parser function: extracts all FlowNodes from file content
+ * Parse a one-liner @flowdoc-line tag
+ * Format: TOPIC | ID | STEP | links | dependency | children
+ * Returns null if line doesn't contain a one-liner tag
  */
-export function parseFile(content: string, filePath: string): FlowNode[] {
+function parseOneLiner(line: string): PendingBlock | null {
+  const withoutComment = line.replace(COMMENT_LINE_PATTERN, "");
+  const match = withoutComment.match(LINE_TAG_PATTERN);
+  if (!match) {
+    return null;
+  }
+
+  const parts = match[1].split("|").map(p => p.trim());
+
+  // Need at least topic, id, step (3 parts)
+  if (parts.length < 3) {
+    return null;
+  }
+
+  const [topic, id, step, linksRaw, dependencyRaw, childrenRaw] = parts;
+
+  const block: PendingBlock = {
+    startLine: 0, // Will be set by caller
+    topic: topic || undefined,
+    id: id || undefined,
+    step: step || undefined,
+  };
+
+  // Parse optional fields if present and non-empty
+  if (linksRaw) {
+    block.linksRaw = linksRaw;
+  }
+
+  if (dependencyRaw) {
+    const { id: depId, note } = parseDependency(dependencyRaw);
+    block.dependency = depId;
+    block.dependencyNote = note;
+  }
+
+  if (childrenRaw) {
+    block.childrenRaw = childrenRaw;
+  }
+
+  return block;
+}
+
+/**
+ * Main parser function: extracts all FlowNodes from file content
+ * @param content - File content to parse
+ * @param filePath - Absolute path to the file (for error reporting)
+ * @returns ParseResult with nodes and validation errors
+ */
+export function parseFile(content: string, filePath: string): ParseResult {
   const lines = content.split("\n");
   const nodes: FlowNode[] = [];
+  const errors: GraphError[] = [];
   let currentBlock: PendingBlock | null = null;
 
   for (let i = 0; i < lines.length; i++) {
@@ -165,12 +256,36 @@ export function parseFile(content: string, filePath: string): FlowNode[] {
     if (!isCommentLine(line)) {
       // Non-comment line: finalize current block if exists
       if (currentBlock) {
-        const node = finalizeBlock(currentBlock, filePath);
-        if (node) {
-          nodes.push(node);
+        const result = finalizeBlock(currentBlock, filePath);
+        if (result.node) {
+          nodes.push(result.node);
         }
+        errors.push(...result.errors);
         currentBlock = null;
       }
+      continue;
+    }
+
+    // Check for one-liner first (self-contained, higher priority)
+    const oneLiner = parseOneLiner(line);
+    if (oneLiner) {
+      // Finalize any existing block first
+      if (currentBlock) {
+        const result = finalizeBlock(currentBlock, filePath);
+        if (result.node) {
+          nodes.push(result.node);
+        }
+        errors.push(...result.errors);
+        currentBlock = null;
+      }
+
+      // Process the one-liner
+      oneLiner.startLine = lineNumber;
+      const result = finalizeBlock(oneLiner, filePath);
+      if (result.node) {
+        nodes.push(result.node);
+      }
+      errors.push(...result.errors);
       continue;
     }
 
@@ -179,10 +294,11 @@ export function parseFile(content: string, filePath: string): FlowNode[] {
     if (!tagResult) {
       // Comment line but no flowdoc tag: finalize block
       if (currentBlock) {
-        const node = finalizeBlock(currentBlock, filePath);
-        if (node) {
-          nodes.push(node);
+        const result = finalizeBlock(currentBlock, filePath);
+        if (result.node) {
+          nodes.push(result.node);
         }
+        errors.push(...result.errors);
         currentBlock = null;
       }
       continue;
@@ -223,11 +339,12 @@ export function parseFile(content: string, filePath: string): FlowNode[] {
 
   // Finalize last block
   if (currentBlock) {
-    const node = finalizeBlock(currentBlock, filePath);
-    if (node) {
-      nodes.push(node);
+    const result = finalizeBlock(currentBlock, filePath);
+    if (result.node) {
+      nodes.push(result.node);
     }
+    errors.push(...result.errors);
   }
 
-  return nodes;
+  return { nodes, errors };
 }

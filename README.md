@@ -105,6 +105,8 @@ Cross-repo navigation opens the target repository in a new VS Code window.
 
 ## Tag Reference
 
+### Multi-line Format
+
 | Tag                   | Required | Description                                 |
 | --------------------- | -------- | ------------------------------------------- |
 | `@flowdoc-topic`      | ✅        | Topic name (groups nodes)                   |
@@ -114,6 +116,62 @@ Cross-repo navigation opens the target repository in a new VS Code window.
 | `@flowdoc-children`   | ❌        | Comma-separated child IDs (for forward nav) |
 | `@flowdoc-links`      | ❌        | Semicolon-separated links                   |
 
+### One-liner Format
+
+Use `@flowdoc-line` for compact single-line documentation:
+
+```
+@flowdoc-line: TOPIC | ID | STEP | links | dependency | children
+```
+
+| Position | Field      | Required | Description                      |
+| -------- | ---------- | -------- | -------------------------------- |
+| 1        | TOPIC      | ✅        | Topic name                       |
+| 2        | ID         | ✅        | Unique identifier                |
+| 3        | STEP       | ✅        | Step description                 |
+| 4        | links      | ❌        | Semicolon-separated links        |
+| 5        | dependency | ❌        | Parent node ID `[optional note]` |
+| 6        | children   | ❌        | Comma-separated child IDs        |
+
+**Examples:**
+```php
+// Minimal (required fields only)
+// @flowdoc-line: checkout | CART-001 | User adds item to cart
+
+// With dependency
+// @flowdoc-line: checkout | CART-002 | Cart totals calculated | | CART-001
+
+// Full format
+// @flowdoc-line: checkout | CART-003 | Proceed to payment | file:checkout.ts:50 | CART-002 [After validation] | CART-004
+```
+
+### Auto-Numeric Sequences
+
+FlowDoc automatically detects numeric sequences in IDs and creates bidirectional links:
+
+```php
+// No explicit dependencies needed - FlowDoc auto-links these!
+// @flowdoc-topic: onboarding
+// @flowdoc-id: STEP-001
+// @flowdoc-step: Welcome screen
+
+// @flowdoc-topic: onboarding
+// @flowdoc-id: STEP-2       // Auto-linked to STEP-001
+// @flowdoc-step: Profile setup
+
+// @flowdoc-topic: onboarding
+// @flowdoc-id: STEP-03      // Auto-linked to STEP-2
+// @flowdoc-step: Preferences
+```
+
+**How it works:**
+- Detects numeric suffix in IDs (e.g., `STEP-001`, `TASK-2`, `FLOW-03`)
+- Handles mixed formats: `001` links to `2` links to `03`
+- Auto-assigns **dependency** to `{prefix}{n-1}` if it exists
+- Auto-assigns **children** to `{prefix}{n+1}` if it exists
+- Only applies within the same topic
+- Explicit dependencies/children override auto-detection
+
 ### Link Formats
 
 | Format    | Example                        | Action                              |
@@ -122,7 +180,17 @@ Cross-repo navigation opens the target repository in a new VS Code window.
 | `file:`   | `file:path/to/file.ts:42`      | Opens file at line                  |
 | `url:`    | `url:https://docs.example.com` | Opens in browser                    |
 
-## Warnings
+## Errors and Warnings
+
+### Errors (Red)
+
+FlowDoc shows errors for missing required fields:
+
+- **missing-topic**: Block has `@flowdoc-id` but no `@flowdoc-topic`
+- **missing-id**: Block has `@flowdoc-topic` but no `@flowdoc-id`
+- **missing-step**: Block has topic and id but no `@flowdoc-step`
+
+### Warnings (Yellow)
 
 FlowDoc shows non-blocking warnings for:
 

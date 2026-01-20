@@ -267,6 +267,7 @@ button:disabled {
   border: 1px solid var(--vscode-inputValidation-warningBorder);
   border-radius: var(--border-radius);
   padding: 16px;
+  margin-bottom: 16px;
 }
 
 .warnings-header {
@@ -302,6 +303,52 @@ button:disabled {
 
 .warning-node {
   font-family: var(--vscode-editor-font-family);
+}
+
+/* Errors Panel */
+#errors-panel {
+  background-color: var(--vscode-inputValidation-errorBackground);
+  border: 1px solid var(--vscode-inputValidation-errorBorder);
+  border-radius: var(--border-radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.errors-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.errors-header h3 {
+  margin: 0;
+  color: var(--vscode-foreground);
+}
+
+#errors-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#errors-list li {
+  padding: 8px;
+  margin: 4px 0;
+  background-color: var(--vscode-editor-background);
+  border-radius: var(--border-radius);
+  font-size: 0.9em;
+}
+
+.error-type {
+  font-weight: bold;
+  color: var(--vscode-editorError-foreground);
+}
+
+.error-file {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.85em;
+  color: var(--vscode-descriptionForeground);
 }
 
 /* Breadcrumbs Panel */
