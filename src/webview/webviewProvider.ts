@@ -313,6 +313,7 @@ export class FlowDocWebviewProvider implements vscode.Disposable {
   /**
    * Handle cross-repo navigation
    * Opens another repo folder in VS Code with FlowDoc at specified node
+   * Uses URI handler to trigger navigation in the new window after indexing
    */
   private async handleCrossRepoNavigation(dependency: string): Promise<void> {
     const atIndex = dependency.indexOf("@");
@@ -322,6 +323,13 @@ export class FlowDocWebviewProvider implements vscode.Disposable {
 
     const repoName = dependency.substring(0, atIndex);
     const nodeId = dependency.substring(atIndex + 1);
+
+    // Get current topic - cross-repo references assume same topic
+    const topic = this.currentGraph?.topic;
+    if (!topic) {
+      vscode.window.showErrorMessage("FlowDoc: Cannot navigate to cross-repo node without a current topic.");
+      return;
+    }
 
     // Look up repo path in config
     const repoRef = this.config?.repos?.[repoName];
@@ -345,15 +353,28 @@ export class FlowDocWebviewProvider implements vscode.Disposable {
       return;
     }
 
-    // Open folder in new window with flowdoc.openAtNode command
-    // Use vscode.open command with the special query to trigger FlowDoc
+    // Show notification about what's happening
+    vscode.window.showInformationMessage(`FlowDoc: Opening "${repoName}" repository. Will index and navigate to "${nodeId}" automatically.`);
+
+    // Open folder in new window
     await vscode.commands.executeCommand("vscode.openFolder", repoUri, {
       forceNewWindow: true,
     });
 
-    // Note: The new window will auto-index (if git repo) and can use flowdoc.openAtNode
-    // We'll show a notification about which node to navigate to
-    vscode.window.showInformationMessage(`FlowDoc: Opening "${repoName}" repository. As we can't trigger navigation automatically, please search "${nodeId}" and navigate manually.`);
+    // Build the URI with topic and nodeId for the new window to handle
+    // Format: vscode://flowdoc/open?topic=X&nodeId=Y
+    const navigationUri = vscode.Uri.from({
+      scheme: vscode.env.uriScheme,
+      authority: "flowdoc",
+      path: "/open",
+      query: `topic=${encodeURIComponent(topic)}&nodeId=${encodeURIComponent(nodeId)}`,
+    });
+
+    // Open the URI - this will trigger the URI handler in the new window
+    // We use a small delay to allow the new window to initialize
+    setTimeout(async () => {
+      await vscode.env.openExternal(navigationUri);
+    }, 1000);
   }
 
   /**

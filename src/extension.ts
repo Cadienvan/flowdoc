@@ -16,6 +16,71 @@ let indexer: WorkspaceIndexer | undefined;
 let webviewProvider: FlowDocWebviewProvider | undefined;
 let currentConfig: FlowDocConfig | undefined;
 let currentGraph: TopicGraph | undefined;
+let pendingNavigation: { topic: string; nodeId: string } | undefined;
+let indexingComplete: boolean = false;
+
+/**
+ * URI Handler for cross-repo navigation
+ * Handles URIs in format: vscode://flowdoc/open?topic=X&nodeId=Y
+ */
+class FlowDocUriHandler implements vscode.UriHandler {
+  async handleUri(uri: vscode.Uri): Promise<void> {
+    if (uri.path !== "/open") {
+      return;
+    }
+
+    // Parse query parameters
+    const params = new URLSearchParams(uri.query);
+    const topic = params.get("topic");
+    const nodeId = params.get("nodeId");
+
+    if (!topic || !nodeId) {
+      vscode.window.showErrorMessage("FlowDoc: Invalid navigation URI - missing topic or nodeId");
+      return;
+    }
+
+    // Store pending navigation request
+    pendingNavigation = { topic, nodeId };
+
+    // If indexing is already complete, process immediately
+    if (indexingComplete && indexer && webviewProvider) {
+      await processPendingNavigation();
+    }
+    // Otherwise, it will be processed after indexing completes
+  }
+}
+
+/**
+ * Process pending cross-repo navigation after indexing
+ */
+async function processPendingNavigation(): Promise<void> {
+  if (!pendingNavigation || !indexer || !webviewProvider) {
+    return;
+  }
+
+  const { topic, nodeId } = pendingNavigation;
+  pendingNavigation = undefined;
+
+  const nodes = indexer.getNodesByTopic(topic);
+  if (nodes.length === 0) {
+    vscode.window.showErrorMessage(`FlowDoc: Topic "${topic}" not found in this repository.`);
+    return;
+  }
+
+  // Check if the specific node exists
+  const nodeExists = nodes.some(n => n.id === nodeId);
+  if (!nodeExists) {
+    vscode.window.showErrorMessage(`FlowDoc: Node "${nodeId}" not found in topic "${topic}".`);
+    return;
+  }
+
+  // Open the graph at the specified node
+  const errors = indexer.getAllErrors();
+  currentGraph = buildGraph(nodes, topic, currentConfig, errors);
+  webviewProvider.showGraph(currentGraph, nodeId);
+
+  vscode.window.showInformationMessage(`FlowDoc: Navigated to "${nodeId}" in topic "${topic}".`);
+}
 
 /**
  * Check if a directory is a git repository
@@ -49,6 +114,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   indexer = new WorkspaceIndexer();
   await indexer.initialize();
 
+  // Register URI handler for cross-repo navigation
+  const uriHandler = new FlowDocUriHandler();
+  context.subscriptions.push(vscode.window.registerUriHandler(uriHandler));
+
   // Initialize webview provider with config for cross-repo navigation
   webviewProvider = new FlowDocWebviewProvider(context.extensionUri, workspaceRoot, currentConfig);
 
@@ -64,14 +133,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Auto-index if this is a git repository
   const isGitRepo = await isGitRepository(workspaceRoot);
   if (isGitRepo) {
+    // Show indexing notification if there's a pending navigation
+    if (pendingNavigation) {
+      vscode.window.showInformationMessage(`FlowDoc: Indexing repository to navigate to "${pendingNavigation.nodeId}"...`);
+    }
+
     await indexer.fullScan();
     const nodeCount = indexer.getAllNodes().length;
     const topicCount = indexer.getTopics().length;
-    if (nodeCount > 0) {
-      vscode.window.showInformationMessage(`FlowDoc: Ready! Found ${nodeCount} nodes across ${topicCount} topics.`);
+
+    // Mark indexing as complete
+    indexingComplete = true;
+
+    // Process any pending navigation from cross-repo link
+    if (pendingNavigation) {
+      await processPendingNavigation();
     } else {
-      vscode.window.showInformationMessage("FlowDoc: Ready! No @flowdoc-* tags found yet.");
+      if (nodeCount > 0) {
+        vscode.window.showInformationMessage(`FlowDoc: Ready! Found ${nodeCount} nodes across ${topicCount} topics.`);
+      } else {
+        vscode.window.showInformationMessage("FlowDoc: Ready! No @flowdoc-* tags found yet.");
+      }
     }
+  } else {
+    // Not a git repo, mark indexing as complete anyway for manual reindex
+    indexingComplete = true;
   }
 
   // Register commands
