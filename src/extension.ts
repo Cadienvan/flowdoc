@@ -169,7 +169,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   currentConfig = await loadConfig(workspaceRoot);
 
   // Initialize indexer (loads .gitignore patterns)
-  indexer = new WorkspaceIndexer();
+  // Pass globalStorageUri for cross-repo index file storage
+  indexer = new WorkspaceIndexer(context.globalStorageUri);
   await indexer.initialize();
 
   // Register URI handler for cross-repo navigation (handles already-open windows)

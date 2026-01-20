@@ -7,6 +7,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { FlowNode, WorkspaceIndex, GraphError } from "../types";
 import { parseFile } from "../parser/commentParser";
+import { writeRepoIndex } from "./crossRepoIndex";
 
 const SUPPORTED_GLOB = "**/*.{php,ts,js}";
 const DEFAULT_EXCLUDES = ["**/node_modules/**", "**/.git/**", "**/vendor/**", "**/dist/**", "**/build/**"];
@@ -20,12 +21,16 @@ export class WorkspaceIndexer implements vscode.Disposable {
   private workspaceRoot: string | undefined;
   private excludePatterns: string[] = DEFAULT_EXCLUDES;
   private diagnosticCollection: vscode.DiagnosticCollection;
+  private globalStorageUri: vscode.Uri | undefined;
 
-  constructor() {
+  constructor(globalStorageUri?: vscode.Uri) {
     this.index = {
       nodesByFile: new Map(),
       lastUpdated: new Date(),
     };
+
+    // Store globalStorageUri for cross-repo index
+    this.globalStorageUri = globalStorageUri;
 
     // Create diagnostic collection for FlowDoc errors
     this.diagnosticCollection = vscode.languages.createDiagnosticCollection(DIAGNOSTIC_SOURCE);
@@ -171,6 +176,19 @@ export class WorkspaceIndexer implements vscode.Disposable {
     );
 
     this.index.lastUpdated = new Date();
+
+    // Write cross-repo index for other windows to read
+    await this.writeCrossRepoIndex();
+  }
+
+  /**
+   * Write cross-repo index to global storage
+   */
+  private async writeCrossRepoIndex(): Promise<void> {
+    if (this.globalStorageUri && this.workspaceRoot) {
+      const allNodes = this.getAllNodes();
+      await writeRepoIndex(this.globalStorageUri, this.workspaceRoot, allNodes);
+    }
   }
 
   /**
@@ -235,16 +253,22 @@ export class WorkspaceIndexer implements vscode.Disposable {
   async reindexFile(uri: vscode.Uri): Promise<void> {
     await this.indexFile(uri);
     this.index.lastUpdated = new Date();
+
+    // Update cross-repo index
+    await this.writeCrossRepoIndex();
   }
 
   /**
    * Remove file from index
    */
-  removeFile(uri: vscode.Uri): void {
+  async removeFile(uri: vscode.Uri): Promise<void> {
     this.index.nodesByFile.delete(uri.fsPath);
     this.errorsByFile.delete(uri.fsPath);
     this.diagnosticCollection.delete(uri);
     this.index.lastUpdated = new Date();
+
+    // Update cross-repo index
+    await this.writeCrossRepoIndex();
   }
 
   /**

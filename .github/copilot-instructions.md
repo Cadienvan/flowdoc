@@ -468,7 +468,12 @@ repos:
     path: /absolute/path/to/shared-lib # Absolute path
 ```
 
-When navigating to cross-repo nodes, FlowDoc will open the target repository folder in a new VS Code window.
+**Navigation behavior:**
+
+1. **If target repo was previously indexed**: Uses `vscode://file/{path}:{line}` protocol for immediate navigation to the correct VS Code window, even if already open.
+2. **If no index exists**: Opens the target repository folder, indexes it, and then navigates to the node.
+
+The cross-repo index is stored in VS Code's global storage directory (`context.globalStorageUri`) and is automatically updated when files change in any indexed repository.
 
 ### Auto-Indexing
 
