@@ -4,8 +4,10 @@
  */
 
 import * as vscode from "vscode";
+import * as path from "path";
 import { TopicGraph, FlowNode, Link, WebviewToExtensionMessage, ExtensionToWebviewMessage, NextOption, SerializedFlowNode, BreadcrumbNode, FlowDocConfig } from "../types";
 import { getChildren } from "../graph/graphBuilder";
+import { storePendingNavigation } from "../extension";
 
 export class FlowDocWebviewProvider implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
@@ -20,6 +22,7 @@ export class FlowDocWebviewProvider implements vscode.Disposable {
     private readonly extensionUri: vscode.Uri,
     private readonly workspaceRoot: string,
     private readonly config?: FlowDocConfig,
+    private readonly context?: vscode.ExtensionContext,
   ) {}
 
   /**
@@ -313,7 +316,7 @@ export class FlowDocWebviewProvider implements vscode.Disposable {
   /**
    * Handle cross-repo navigation
    * Opens another repo folder in VS Code with FlowDoc at specified node
-   * Uses URI handler to trigger navigation in the new window after indexing
+   * Uses globalState to pass navigation info to the new window
    */
   private async handleCrossRepoNavigation(dependency: string): Promise<void> {
     const atIndex = dependency.indexOf("@");
@@ -338,7 +341,11 @@ export class FlowDocWebviewProvider implements vscode.Disposable {
       return;
     }
 
-    const repoPath = repoRef.path;
+    // Resolve the repo path (handle relative paths)
+    let repoPath = repoRef.path;
+    if (!path.isAbsolute(repoPath)) {
+      repoPath = path.resolve(this.workspaceRoot, repoPath);
+    }
     const repoUri = vscode.Uri.file(repoPath);
 
     // Check if folder exists
@@ -353,28 +360,18 @@ export class FlowDocWebviewProvider implements vscode.Disposable {
       return;
     }
 
+    // Store pending navigation in globalState for the target window to pick up
+    if (this.context) {
+      await storePendingNavigation(this.context, repoPath, topic, nodeId);
+    }
+
     // Show notification about what's happening
     vscode.window.showInformationMessage(`FlowDoc: Opening "${repoName}" repository. Will index and navigate to "${nodeId}" automatically.`);
 
-    // Open folder in new window
+    // Open folder in new window - the new window will check globalState on activation
     await vscode.commands.executeCommand("vscode.openFolder", repoUri, {
       forceNewWindow: true,
     });
-
-    // Build the URI with topic and nodeId for the new window to handle
-    // Format: vscode://flowdoc/open?topic=X&nodeId=Y
-    const navigationUri = vscode.Uri.from({
-      scheme: vscode.env.uriScheme,
-      authority: "flowdoc",
-      path: "/open",
-      query: `topic=${encodeURIComponent(topic)}&nodeId=${encodeURIComponent(nodeId)}`,
-    });
-
-    // Open the URI - this will trigger the URI handler in the new window
-    // We use a small delay to allow the new window to initialize
-    setTimeout(async () => {
-      await vscode.env.openExternal(navigationUri);
-    }, 1000);
   }
 
   /**

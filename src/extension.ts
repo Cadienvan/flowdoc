@@ -17,37 +17,46 @@ let webviewProvider: FlowDocWebviewProvider | undefined;
 let currentConfig: FlowDocConfig | undefined;
 let currentGraph: TopicGraph | undefined;
 let pendingNavigation: { topic: string; nodeId: string } | undefined;
-let indexingComplete: boolean = false;
+let extensionContext: vscode.ExtensionContext | undefined;
 
 /**
- * URI Handler for cross-repo navigation
- * Handles URIs in format: vscode://flowdoc/open?topic=X&nodeId=Y
+ * Key prefix for storing pending navigation in globalState
  */
-class FlowDocUriHandler implements vscode.UriHandler {
-  async handleUri(uri: vscode.Uri): Promise<void> {
-    if (uri.path !== "/open") {
-      return;
+const PENDING_NAV_KEY_PREFIX = "flowdoc.pendingNavigation.";
+
+/**
+ * Get the globalState key for a workspace path
+ */
+function getPendingNavKey(workspacePath: string): string {
+  return `${PENDING_NAV_KEY_PREFIX}${workspacePath}`;
+}
+
+/**
+ * Store pending navigation for a target workspace (called from source window)
+ */
+export async function storePendingNavigation(context: vscode.ExtensionContext, targetWorkspacePath: string, topic: string, nodeId: string): Promise<void> {
+  const key = getPendingNavKey(targetWorkspacePath);
+  await context.globalState.update(key, { topic, nodeId, timestamp: Date.now() });
+}
+
+/**
+ * Retrieve and clear pending navigation for current workspace (called from target window)
+ */
+async function retrievePendingNavigation(context: vscode.ExtensionContext, workspacePath: string): Promise<{ topic: string; nodeId: string } | undefined> {
+  const key = getPendingNavKey(workspacePath);
+  const stored = context.globalState.get<{ topic: string; nodeId: string; timestamp: number }>(key);
+
+  if (stored) {
+    // Clear the pending navigation
+    await context.globalState.update(key, undefined);
+
+    // Only use if it's recent (within last 30 seconds) to avoid stale requests
+    if (Date.now() - stored.timestamp < 30000) {
+      return { topic: stored.topic, nodeId: stored.nodeId };
     }
-
-    // Parse query parameters
-    const params = new URLSearchParams(uri.query);
-    const topic = params.get("topic");
-    const nodeId = params.get("nodeId");
-
-    if (!topic || !nodeId) {
-      vscode.window.showErrorMessage("FlowDoc: Invalid navigation URI - missing topic or nodeId");
-      return;
-    }
-
-    // Store pending navigation request
-    pendingNavigation = { topic, nodeId };
-
-    // If indexing is already complete, process immediately
-    if (indexingComplete && indexer && webviewProvider) {
-      await processPendingNavigation();
-    }
-    // Otherwise, it will be processed after indexing completes
   }
+
+  return undefined;
 }
 
 /**
@@ -98,6 +107,9 @@ async function isGitRepository(workspaceRoot: string): Promise<boolean> {
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  // Store context for cross-repo navigation
+  extensionContext = context;
+
   // Get workspace root
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
   if (!workspaceFolder) {
@@ -107,6 +119,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const workspaceRoot = workspaceFolder.uri.fsPath;
 
+  // Check for pending cross-repo navigation request (stored by source window)
+  pendingNavigation = await retrievePendingNavigation(context, workspaceRoot);
+
   // Load config
   currentConfig = await loadConfig(workspaceRoot);
 
@@ -114,12 +129,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   indexer = new WorkspaceIndexer();
   await indexer.initialize();
 
-  // Register URI handler for cross-repo navigation
-  const uriHandler = new FlowDocUriHandler();
-  context.subscriptions.push(vscode.window.registerUriHandler(uriHandler));
-
-  // Initialize webview provider with config for cross-repo navigation
-  webviewProvider = new FlowDocWebviewProvider(context.extensionUri, workspaceRoot, currentConfig);
+  // Initialize webview provider with config and context for cross-repo navigation
+  webviewProvider = new FlowDocWebviewProvider(context.extensionUri, workspaceRoot, currentConfig, context);
 
   // Set callback for Home button
   webviewProvider.setOnGoHomeCallback(() => {
@@ -142,9 +153,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const nodeCount = indexer.getAllNodes().length;
     const topicCount = indexer.getTopics().length;
 
-    // Mark indexing as complete
-    indexingComplete = true;
-
     // Process any pending navigation from cross-repo link
     if (pendingNavigation) {
       await processPendingNavigation();
@@ -155,9 +163,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         vscode.window.showInformationMessage("FlowDoc: Ready! No @flowdoc-* tags found yet.");
       }
     }
-  } else {
-    // Not a git repo, mark indexing as complete anyway for manual reindex
-    indexingComplete = true;
   }
 
   // Register commands
