@@ -8,7 +8,7 @@ import * as path from "path";
 import { TopicGraph, FlowNode, Link, WebviewToExtensionMessage, ExtensionToWebviewMessage, NextOption, SerializedFlowNode, BreadcrumbNode, FlowDocConfig } from "../types";
 import { getChildren } from "../graph/graphBuilder";
 import { storePendingNavigation } from "../extension";
-import { getCrossRepoNodeLocation } from "../indexer/crossRepoIndex";
+import { getCrossRepoNodeLocation, writePendingFileNavigation } from "../indexer/crossRepoIndex";
 
 export class FlowDocWebviewProvider implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
@@ -367,23 +367,13 @@ export class FlowDocWebviewProvider implements vscode.Disposable {
       const nodeLocation = await getCrossRepoNodeLocation(globalStorageUri, repoPath, topic, nodeId);
 
       if (nodeLocation) {
-        // Index exists! Use vscode://file/ protocol for direct navigation
+        // Index exists! Write pending navigation for target window to pick up
+        await writePendingFileNavigation(globalStorageUri, nodeLocation.sourceFile, topic, nodeId);
+
+        // Use vscode://file/ protocol for direct navigation
         // This works even if the file is in an already-open VS Code window
         const fileUrl = `vscode://file/${nodeLocation.sourceFile}:${nodeLocation.sourceLine}`;
         await vscode.env.openExternal(vscode.Uri.parse(fileUrl));
-
-        // Also trigger FlowDoc URI handler for webview navigation
-        const navigationUri = vscode.Uri.from({
-          scheme: vscode.env.uriScheme,
-          authority: "flowdoc",
-          path: "/open",
-          query: `topic=${encodeURIComponent(topic)}&nodeId=${encodeURIComponent(nodeId)}`,
-        });
-
-        // Small delay to allow the window to be focused
-        setTimeout(async () => {
-          await vscode.env.openExternal(navigationUri);
-        }, 300);
 
         return;
       }

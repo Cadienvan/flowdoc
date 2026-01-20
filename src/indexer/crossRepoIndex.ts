@@ -148,3 +148,84 @@ export async function deleteRepoIndex(globalStorageUri: vscode.Uri, repoPath: st
     // Index doesn't exist, ignore
   }
 }
+
+/**
+ * Pending file navigation stored in global storage for cross-window communication
+ */
+export interface PendingFileNavigation {
+  targetFile: string;
+  topic: string;
+  nodeId: string;
+  timestamp: number;
+}
+
+/**
+ * Get the pending navigation file URI
+ */
+function getPendingNavUri(globalStorageUri: vscode.Uri): vscode.Uri {
+  return vscode.Uri.joinPath(globalStorageUri, "pending-navigation.json");
+}
+
+/**
+ * Write pending file navigation to global storage
+ * This allows cross-window communication when using vscode://file/ protocol
+ * @param globalStorageUri - Extension's global storage directory
+ * @param targetFile - Absolute path to the target file
+ * @param topic - Topic name
+ * @param nodeId - Node ID to navigate to
+ */
+export async function writePendingFileNavigation(globalStorageUri: vscode.Uri, targetFile: string, topic: string, nodeId: string): Promise<void> {
+  try {
+    // Ensure global storage directory exists
+    try {
+      await vscode.workspace.fs.createDirectory(globalStorageUri);
+    } catch {
+      // Directory may already exist, ignore error
+    }
+
+    const pending: PendingFileNavigation = {
+      targetFile,
+      topic,
+      nodeId,
+      timestamp: Date.now(),
+    };
+
+    const pendingUri = getPendingNavUri(globalStorageUri);
+    const content = Buffer.from(JSON.stringify(pending, null, 2), "utf8");
+    await vscode.workspace.fs.writeFile(pendingUri, content);
+  } catch (error) {
+    console.error(`FlowDoc: Failed to write pending navigation: ${error}`);
+  }
+}
+
+/**
+ * Read and clear pending file navigation from global storage
+ * @param globalStorageUri - Extension's global storage directory
+ * @param currentFile - The file that was just opened (to match against)
+ * @returns Pending navigation if it matches and is recent, null otherwise
+ */
+export async function readPendingFileNavigation(globalStorageUri: vscode.Uri, currentFile: string): Promise<{ topic: string; nodeId: string } | null> {
+  try {
+    const pendingUri = getPendingNavUri(globalStorageUri);
+    const content = await vscode.workspace.fs.readFile(pendingUri);
+    const json = Buffer.from(content).toString("utf8");
+    const pending = JSON.parse(json) as PendingFileNavigation;
+
+    // Check if this matches the current file and is recent (within 10 seconds)
+    if (pending.targetFile === currentFile && Date.now() - pending.timestamp < 10000) {
+      // Clear the pending navigation
+      await vscode.workspace.fs.delete(pendingUri);
+      return { topic: pending.topic, nodeId: pending.nodeId };
+    }
+
+    // If it's old (> 30 seconds), clean it up
+    if (Date.now() - pending.timestamp > 30000) {
+      await vscode.workspace.fs.delete(pendingUri);
+    }
+
+    return null;
+  } catch {
+    // File doesn't exist or is unreadable
+    return null;
+  }
+}

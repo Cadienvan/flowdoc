@@ -11,6 +11,7 @@ import { loadConfig } from "./config/configLoader";
 import { FlowDocWebviewProvider } from "./webview/webviewProvider";
 import { FlowDocCodeLensProvider } from "./codelens/flowDocCodeLensProvider";
 import { FlowDocConfig, TopicGraph } from "./types";
+import { readPendingFileNavigation } from "./indexer/crossRepoIndex";
 
 let indexer: WorkspaceIndexer | undefined;
 let webviewProvider: FlowDocWebviewProvider | undefined;
@@ -230,7 +231,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await openAtNode(topic, nodeId);
   });
 
-  context.subscriptions.push(pickTopicCommand, openGraphCommand, reindexCommand, openAtNodeCommand, codeLensDisposable, indexer, webviewProvider);
+  // Listen for file opens to handle cross-window FlowDoc navigation
+  // When vscode://file/ opens a file, we check for pending navigation in global storage
+  const editorChangeDisposable = vscode.window.onDidChangeActiveTextEditor(async editor => {
+    if (!editor || !indexer || !webviewProvider) {
+      return;
+    }
+
+    const filePath = editor.document.uri.fsPath;
+    const pending = await readPendingFileNavigation(context.globalStorageUri, filePath);
+
+    if (pending) {
+      // There's a pending navigation for this file - open FlowDoc
+      await navigateToNode(pending.topic, pending.nodeId);
+    }
+  });
+
+  context.subscriptions.push(pickTopicCommand, openGraphCommand, reindexCommand, openAtNodeCommand, codeLensDisposable, editorChangeDisposable, indexer, webviewProvider);
 }
 
 /**
