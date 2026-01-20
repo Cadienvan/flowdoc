@@ -2,7 +2,7 @@
   "name": "flowdoc",
   "displayName": "FlowDoc",
   "description": "Navigate code documentation graphs from @flowdoc-* comment tags",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "MichaelDiPrisco",
   "engines": {
     "vscode": "^1.85.0"
