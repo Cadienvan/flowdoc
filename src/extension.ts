@@ -70,6 +70,19 @@ async function processPendingNavigation(): Promise<void> {
   const { topic, nodeId } = pendingNavigation;
   pendingNavigation = undefined;
 
+  await navigateToNode(topic, nodeId);
+}
+
+/**
+ * Navigate to a specific node in a topic
+ * Used by both pending navigation and URI handler
+ */
+async function navigateToNode(topic: string, nodeId: string): Promise<void> {
+  if (!indexer || !webviewProvider) {
+    vscode.window.showErrorMessage("FlowDoc: Extension not properly initialized");
+    return;
+  }
+
   const nodes = indexer.getNodesByTopic(topic);
   if (nodes.length === 0) {
     vscode.window.showErrorMessage(`FlowDoc: Topic "${topic}" not found in this repository.`);
@@ -89,6 +102,36 @@ async function processPendingNavigation(): Promise<void> {
   webviewProvider.showGraph(currentGraph, nodeId);
 
   vscode.window.showInformationMessage(`FlowDoc: Navigated to "${nodeId}" in topic "${topic}".`);
+}
+
+/**
+ * URI Handler for cross-repo navigation (handles already-open windows)
+ * Handles URIs in format: vscode://flowdoc/open?topic=X&nodeId=Y
+ */
+class FlowDocUriHandler implements vscode.UriHandler {
+  async handleUri(uri: vscode.Uri): Promise<void> {
+    if (uri.path !== "/open") {
+      return;
+    }
+
+    // Parse query parameters
+    const params = new URLSearchParams(uri.query);
+    const topic = params.get("topic");
+    const nodeId = params.get("nodeId");
+
+    if (!topic || !nodeId) {
+      vscode.window.showErrorMessage("FlowDoc: Invalid navigation URI - missing topic or nodeId");
+      return;
+    }
+
+    // If indexer is ready, navigate immediately
+    if (indexer && webviewProvider) {
+      await navigateToNode(topic, nodeId);
+    } else {
+      // Store for later processing after activation completes
+      pendingNavigation = { topic, nodeId };
+    }
+  }
 }
 
 /**
@@ -128,6 +171,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Initialize indexer (loads .gitignore patterns)
   indexer = new WorkspaceIndexer();
   await indexer.initialize();
+
+  // Register URI handler for cross-repo navigation (handles already-open windows)
+  const uriHandler = new FlowDocUriHandler();
+  context.subscriptions.push(vscode.window.registerUriHandler(uriHandler));
 
   // Initialize webview provider with config and context for cross-repo navigation
   webviewProvider = new FlowDocWebviewProvider(context.extensionUri, workspaceRoot, currentConfig, context);

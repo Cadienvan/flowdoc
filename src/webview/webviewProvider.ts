@@ -316,7 +316,7 @@ export class FlowDocWebviewProvider implements vscode.Disposable {
   /**
    * Handle cross-repo navigation
    * Opens another repo folder in VS Code with FlowDoc at specified node
-   * Uses globalState to pass navigation info to the new window
+   * Uses both globalState (for new windows) and URI handler (for already-open windows)
    */
   private async handleCrossRepoNavigation(dependency: string): Promise<void> {
     const atIndex = dependency.indexOf("@");
@@ -360,18 +360,33 @@ export class FlowDocWebviewProvider implements vscode.Disposable {
       return;
     }
 
-    // Store pending navigation in globalState for the target window to pick up
+    // Store pending navigation in globalState for NEW windows (picked up on activation)
     if (this.context) {
       await storePendingNavigation(this.context, repoPath, topic, nodeId);
     }
 
     // Show notification about what's happening
-    vscode.window.showInformationMessage(`FlowDoc: Opening "${repoName}" repository. Will index and navigate to "${nodeId}" automatically.`);
+    vscode.window.showInformationMessage(`FlowDoc: Opening "${repoName}" repository. Will navigate to "${nodeId}" automatically.`);
 
-    // Open folder in new window - the new window will check globalState on activation
+    // Open folder - may open new window or focus existing one
     await vscode.commands.executeCommand("vscode.openFolder", repoUri, {
       forceNewWindow: true,
     });
+
+    // Build the URI for already-open windows (URI handler triggers immediately)
+    // Format: vscode://flowdoc/open?topic=X&nodeId=Y
+    const navigationUri = vscode.Uri.from({
+      scheme: vscode.env.uriScheme,
+      authority: "flowdoc",
+      path: "/open",
+      query: `topic=${encodeURIComponent(topic)}&nodeId=${encodeURIComponent(nodeId)}`,
+    });
+
+    // Small delay to allow the window to be focused, then trigger URI handler
+    // This handles the case where the target repo is already open
+    setTimeout(async () => {
+      await vscode.env.openExternal(navigationUri);
+    }, 500);
   }
 
   /**

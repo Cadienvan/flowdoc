@@ -14,7 +14,8 @@
   "activationEvents": [
     "workspaceContains:**/*.php",
     "workspaceContains:**/*.ts",
-    "workspaceContains:**/*.js"
+    "workspaceContains:**/*.js",
+    "onUri"
   ],
   "main": "./out/extension.js",
   "contributes": {
