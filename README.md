@@ -182,17 +182,19 @@ FlowDoc automatically detects numeric sequences in IDs and creates bidirectional
 
 ## Errors and Warnings
 
-### Errors (Red)
+### Errors (Yellow underlines in editor)
 
-FlowDoc shows errors for missing required fields:
+FlowDoc shows validation errors as VS Code diagnostics (yellow underlines) directly in your code for missing required fields:
 
 - **missing-topic**: Block has `@flowdoc-id` but no `@flowdoc-topic`
 - **missing-id**: Block has `@flowdoc-topic` but no `@flowdoc-id`
 - **missing-step**: Block has topic and id but no `@flowdoc-step`
 
-### Warnings (Yellow)
+These appear in the Problems panel and as squiggly underlines in the editor.
 
-FlowDoc shows non-blocking warnings for:
+### Warnings (Yellow in webview)
+
+FlowDoc shows non-blocking warnings in the webview panel for:
 
 - **Duplicate ID**: Same ID used twice in a topic (first occurrence wins)
 - **Missing Dependency**: Dependency ID not found (node treated as root)

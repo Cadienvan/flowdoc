@@ -20,9 +20,6 @@
   /** @type {any[]} */
   let warnings = [];
 
-  /** @type {any[]} */
-  let errors = [];
-
   // DOM Elements
   const topicTitle = document.getElementById("topic-title");
   const nodeId = document.getElementById("node-id");
@@ -40,11 +37,6 @@
   const warningsPanel = document.getElementById("warnings-panel");
   const warningsList = document.getElementById("warnings-list");
   const closeWarnings = document.getElementById("close-warnings");
-  const errorsToggle = document.getElementById("errors-toggle");
-  const errorsCount = document.getElementById("errors-count");
-  const errorsPanel = document.getElementById("errors-panel");
-  const errorsList = document.getElementById("errors-list");
-  const closeErrors = document.getElementById("close-errors");
   const goToSource = document.getElementById("go-to-source");
   const btnHome = document.getElementById("btn-home");
   const btnBreadcrumbs = document.getElementById("btn-breadcrumbs");
@@ -78,14 +70,6 @@
 
   closeWarnings?.addEventListener("click", () => {
     warningsPanel?.setAttribute("hidden", "");
-  });
-
-  errorsToggle?.addEventListener("click", () => {
-    errorsPanel?.toggleAttribute("hidden");
-  });
-
-  closeErrors?.addEventListener("click", () => {
-    errorsPanel?.setAttribute("hidden", "");
   });
 
   // Home button
@@ -134,11 +118,6 @@
       case "showWarnings":
         warnings = message.warnings;
         renderWarnings();
-        break;
-
-      case "showErrors":
-        errors = message.errors;
-        renderErrors();
         break;
     }
   });
@@ -290,35 +269,6 @@
     } else {
       warningsToggle.setAttribute("hidden", "");
       warningsPanel?.setAttribute("hidden", "");
-    }
-  }
-
-  /**
-   * Render errors
-   */
-  function renderErrors() {
-    if (!errorsToggle || !errorsCount || !errorsList) {
-      return;
-    }
-
-    if (errors.length > 0) {
-      errorsToggle.removeAttribute("hidden");
-      errorsCount.textContent = String(errors.length);
-
-      errorsList.innerHTML = "";
-      errors.forEach((/** @type {any} */ error) => {
-        const li = document.createElement("li");
-        const fileName = error.sourceFile?.split("/").pop() || "unknown";
-        li.innerHTML = `
-          <span class="error-type">${error.type}</span><br>
-          ${error.message}<br>
-          <span class="error-file">${fileName}:${error.sourceLine}</span>
-        `;
-        errorsList.appendChild(li);
-      });
-    } else {
-      errorsToggle.setAttribute("hidden", "");
-      errorsPanel?.setAttribute("hidden", "");
     }
   }
 

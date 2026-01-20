@@ -335,6 +335,9 @@ interface GraphError {
 - Errors are collected alongside valid nodes (partial graph display)
 - `parseFile()` returns `ParseResult { nodes: FlowNode[], errors: GraphError[] }`
 - Errors include partial data for context in error messages
+- **Errors display as VS Code diagnostics** (yellow underlines in the editor)
+- Uses `vscode.languages.createDiagnosticCollection()` in `WorkspaceIndexer`
+- Diagnostic severity: `Warning` (yellow) - not blocking, just informational
 
 ### Adding New Tags
 
@@ -540,20 +543,20 @@ Files in `node_modules` are excluded via glob pattern.
 
 ## Glossary
 
-| Term                  | Definition                                                          |
-| --------------------- | ------------------------------------------------------------------- |
-| FlowNode              | A documentation node extracted from @flowdoc-\* comments            |
-| TopicGraph            | The complete graph structure for a single topic                     |
-| Topic                 | A grouping identifier for related FlowNodes                         |
-| Dependency            | Reference to a parent FlowNode (creates backward graph edge)        |
-| Children              | Explicit forward references to child FlowNodes                      |
-| Cross-repo Dependency | Dependency in format `repo-name@node-id` for external repos         |
-| Cross-repo Child      | Child reference in format `repo-name@node-id` for external repos    |
-| Root                  | A FlowNode with no dependency (entry point)                         |
-| Dangling Root         | A FlowNode whose dependency doesn't exist                           |
-| ExternalRepoRef       | Configuration entry mapping repo name to local filesystem path      |
-| One-liner             | Compact `@flowdoc-line` format with pipe-separated fields           |
-| GraphError            | Validation error for missing required fields (shown in red in UI)   |
-| GraphWarning          | Non-blocking warning for graph issues (shown in yellow in UI)       |
-| Auto-numeric          | Automatic dependency/children detection based on numeric ID suffix  |
-| ParseResult           | Return type from parser containing both `nodes` and `errors` arrays |
+| Term                  | Definition                                                                 |
+| --------------------- | -------------------------------------------------------------------------- |
+| FlowNode              | A documentation node extracted from @flowdoc-\* comments                   |
+| TopicGraph            | The complete graph structure for a single topic                            |
+| Topic                 | A grouping identifier for related FlowNodes                                |
+| Dependency            | Reference to a parent FlowNode (creates backward graph edge)               |
+| Children              | Explicit forward references to child FlowNodes                             |
+| Cross-repo Dependency | Dependency in format `repo-name@node-id` for external repos                |
+| Cross-repo Child      | Child reference in format `repo-name@node-id` for external repos           |
+| Root                  | A FlowNode with no dependency (entry point)                                |
+| Dangling Root         | A FlowNode whose dependency doesn't exist                                  |
+| ExternalRepoRef       | Configuration entry mapping repo name to local filesystem path             |
+| One-liner             | Compact `@flowdoc-line` format with pipe-separated fields                  |
+| GraphError            | Validation error for missing required fields (shown as VS Code diagnostic) |
+| GraphWarning          | Non-blocking warning for graph issues (shown in yellow in webview)         |
+| Auto-numeric          | Automatic dependency/children detection based on numeric ID suffix         |
+| ParseResult           | Return type from parser containing both `nodes` and `errors` arrays        |

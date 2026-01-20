@@ -185,4 +185,64 @@ function autoStep4() {}
 
 function autoStep5() {}
 
-export { showRegistrationForm, validateRegistrationForm, submitRegistration, redirectToDashboard, showRegistrationError, initializePayment, collectPaymentDetails, processPayment, confirmPayment, placeOrder, validateOrder, initiatePayment, pickAndPack, generateShippingLabel, autoStep1, autoStep2, autoStep3, autoStep4, autoStep5 };
+// ============================================
+// Topic: Error Demo
+// Demonstrates error display for missing required fields
+// ============================================
+
+// Missing @flowdoc-step - will show error
+// @flowdoc-topic: error-demo
+// @flowdoc-id: ERR-001
+
+function missingStep() {}
+
+// Missing @flowdoc-id - will show error
+// @flowdoc-topic: error-demo
+// @flowdoc-step: This step has no ID
+
+function missingId() {}
+
+// Missing @flowdoc-topic - will show error (shown in any topic view)
+// @flowdoc-id: ORPHAN-001
+// @flowdoc-step: This step has no topic
+
+function missingTopic() {}
+
+// One-liner with missing step (only 2 parts) - will show error
+// @flowdoc-line: error-demo | ERR-002
+
+function oneLineMissingStep() {}
+
+// Valid node in error-demo topic
+// @flowdoc-topic: error-demo
+// @flowdoc-id: ERR-VALID
+// @flowdoc-step: This is a valid node in the error demo topic
+
+function validErrorDemo() {}
+
+export {
+  showRegistrationForm,
+  validateRegistrationForm,
+  submitRegistration,
+  redirectToDashboard,
+  showRegistrationError,
+  initializePayment,
+  collectPaymentDetails,
+  processPayment,
+  confirmPayment,
+  placeOrder,
+  validateOrder,
+  initiatePayment,
+  pickAndPack,
+  generateShippingLabel,
+  autoStep1,
+  autoStep2,
+  autoStep3,
+  autoStep4,
+  autoStep5,
+  missingStep,
+  missingId,
+  missingTopic,
+  oneLineMissingStep,
+  validErrorDemo,
+};

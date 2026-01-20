@@ -131,7 +131,6 @@ export type ExtensionToWebviewMessage =
       breadcrumbs: BreadcrumbNode[];
     }
   | { command: "showWarnings"; warnings: GraphWarning[] }
-  | { command: "showErrors"; errors: GraphError[] }
   | { command: "setTopic"; topic: string };
 
 /**

@@ -10,6 +10,7 @@ import { parseFile } from "../parser/commentParser";
 
 const SUPPORTED_GLOB = "**/*.{php,ts,js}";
 const DEFAULT_EXCLUDES = ["**/node_modules/**", "**/.git/**", "**/vendor/**", "**/dist/**", "**/build/**"];
+const DIAGNOSTIC_SOURCE = "FlowDoc";
 
 export class WorkspaceIndexer implements vscode.Disposable {
   private index: WorkspaceIndex;
@@ -18,12 +19,16 @@ export class WorkspaceIndexer implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private workspaceRoot: string | undefined;
   private excludePatterns: string[] = DEFAULT_EXCLUDES;
+  private diagnosticCollection: vscode.DiagnosticCollection;
 
   constructor() {
     this.index = {
       nodesByFile: new Map(),
       lastUpdated: new Date(),
     };
+
+    // Create diagnostic collection for FlowDoc errors
+    this.diagnosticCollection = vscode.languages.createDiagnosticCollection(DIAGNOSTIC_SOURCE);
 
     // Get workspace root for gitignore loading
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -129,6 +134,7 @@ export class WorkspaceIndexer implements vscode.Disposable {
   async fullScan(): Promise<void> {
     this.index.nodesByFile.clear();
     this.errorsByFile.clear();
+    this.diagnosticCollection.clear();
 
     const excludeGlob = this.buildExcludeGlob();
     const files = await vscode.workspace.findFiles(SUPPORTED_GLOB, excludeGlob);
@@ -184,12 +190,43 @@ export class WorkspaceIndexer implements vscode.Disposable {
 
       if (result.errors.length > 0) {
         this.errorsByFile.set(uri.fsPath, result.errors);
+        this.updateDiagnostics(uri, document, result.errors);
       } else {
         this.errorsByFile.delete(uri.fsPath);
+        this.diagnosticCollection.delete(uri);
       }
     } catch (error) {
       vscode.window.showErrorMessage(`FlowDoc: Error indexing ${uri.fsPath}: ${error}`);
     }
+  }
+
+  /**
+   * Update VS Code diagnostics for a file
+   */
+  private updateDiagnostics(uri: vscode.Uri, document: vscode.TextDocument, errors: GraphError[]): void {
+    const diagnostics: vscode.Diagnostic[] = errors.map(error => {
+      // Line is 1-based, VS Code uses 0-based
+      const line = error.sourceLine - 1;
+      const lineText = document.lineAt(line).text;
+
+      // Build message with missing fields
+      const missingFields: string[] = [];
+      if (!error.partialData?.topic) missingFields.push("@flowdoc-topic");
+      if (!error.partialData?.id) missingFields.push("@flowdoc-id");
+      if (!error.partialData?.step) missingFields.push("@flowdoc-step");
+
+      const message = `FlowDoc: Missing required field(s): ${missingFields.join(", ")}`;
+
+      // Create range for the entire line (underline the whole comment block start)
+      const range = new vscode.Range(line, 0, line, lineText.length);
+
+      const diagnostic = new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Warning);
+      diagnostic.source = DIAGNOSTIC_SOURCE;
+
+      return diagnostic;
+    });
+
+    this.diagnosticCollection.set(uri, diagnostics);
   }
 
   /**
@@ -206,6 +243,7 @@ export class WorkspaceIndexer implements vscode.Disposable {
   removeFile(uri: vscode.Uri): void {
     this.index.nodesByFile.delete(uri.fsPath);
     this.errorsByFile.delete(uri.fsPath);
+    this.diagnosticCollection.delete(uri);
     this.index.lastUpdated = new Date();
   }
 
@@ -296,6 +334,8 @@ export class WorkspaceIndexer implements vscode.Disposable {
    * Dispose resources
    */
   dispose(): void {
+    this.diagnosticCollection.clear();
+    this.diagnosticCollection.dispose();
     for (const disposable of this.disposables) {
       disposable.dispose();
     }

@@ -281,8 +281,8 @@ export function buildGraph(nodes: FlowNode[], topic: string, config?: FlowDocCon
     detectCycle(rootId);
   }
 
-  // Filter errors for this topic only
-  const topicErrors = (errors || []).filter(e => e.partialData?.topic === topic);
+  // Filter errors: include errors for this topic OR errors without a topic (can't be assigned to any topic)
+  const topicErrors = (errors || []).filter(e => e.partialData?.topic === topic || !e.partialData?.topic);
 
   return {
     topic,
